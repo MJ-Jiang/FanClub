@@ -1,0 +1,217 @@
+package org.example.finalproject;
+
+import javafx.application.Application;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.scene.text.Font;
+import javafx.stage.Stage;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.ArrayList;
+
+public class FanQuiz extends Application {
+    private  VBox wholePane;
+    private  GridPane gridPane;
+    private Button nextButton;
+    private int questionNumber = 1;
+    private ImageView imageView;
+    private  int correctAnswers = 0;
+    private Button checkButton;
+    private ArrayList<FillInBlankQuestion> blankQuestions;
+    private ArrayList<MultipleChoiceQuestion> multipleChoiceQuestions;
+    private String name;
+
+    @Override
+    public void start(Stage primaryStage){
+        wholePane = new VBox();
+        wholePane.setAlignment(Pos.CENTER);
+        wholePane.setSpacing(20);
+        /*input star's name */
+        Label welcome = new Label("Welcome to FanApp!");
+        welcome.setFont(new Font("Arial", 20));
+        Label introduction = new Label("Input your star's name and complete 10 questions, then you have the chance to join fan club!");
+
+        gridPane = new GridPane();
+        gridPane.setAlignment(Pos.CENTER);
+        gridPane.setPadding(new Insets(10, 5, 10, 10));
+        gridPane.setHgap(6);
+        gridPane.setVgap(15);
+
+        gridPane.add(new Label("Star's Name: "), 0, 0);
+        TextField nameTextField = new TextField();
+        gridPane.add(nameTextField, 1 ,0);
+
+        nextButton = new Button("Next");
+        HBox nextHBox = new HBox(nextButton);
+        nextHBox.setAlignment(Pos.BASELINE_RIGHT);
+        gridPane.add(nextHBox, 1, 5);
+
+        wholePane.getChildren().addAll(welcome, introduction, gridPane);
+
+        nextButton.setOnAction(e ->{
+            name = nameTextField.getText();
+            if (name.isEmpty()){
+                showAlert("Error", "Please fill in the name.", Alert.AlertType.ERROR);
+            }
+            QuizReader reader = new QuizReader();
+            reader.readFile(name);
+            if (reader.isFileReadSuccessfully()){
+                blankQuestions = reader.getBlankQuestions();
+                multipleChoiceQuestions =reader.getMultipleChoiceQuestions();
+                displayQuestions(wholePane, blankQuestions, multipleChoiceQuestions);
+            }else {
+                showAlert("Error", "File doesn't exist.", Alert.AlertType.ERROR);
+            }
+
+        });
+
+        Scene scene = new Scene(wholePane,700, 600);
+        primaryStage.setTitle("Stars");
+        primaryStage.setScene(scene);
+        primaryStage.show();
+    }
+
+    private void showAlert(String title, String message, Alert.AlertType alertType){
+        Alert alert = new Alert(alertType);
+        alert.setTitle(title);
+        alert.setHeaderText(null);//将警告对话框的标题文本设置为空。
+        alert.setContentText(message);
+        alert.showAndWait();//用于显示警告对话框并等待用户关闭对话框.调用此方法会阻塞当前线程，直到用户关闭对话框为止。
+    }
+
+    private void displayQuestions(VBox wholePane, ArrayList<FillInBlankQuestion> fillInBlankQuestion,
+                                ArrayList<MultipleChoiceQuestion> multipleChoiceQuestions) {
+        wholePane.getChildren().clear();
+        gridPane.getChildren().clear();
+
+        gridPane.setPadding(new Insets(10));
+        gridPane.setVgap(10); // 设置行间距为10像素
+        gridPane.setHgap(80);
+
+        checkButton = new Button("Check");
+        checkButton.setVisible(false);
+        wholePane.getChildren().add(checkButton);
+
+        VBox questionAndAnswer = new VBox();
+        questionAndAnswer.setAlignment(Pos.CENTER);
+        questionAndAnswer.setSpacing(20);
+
+        String questionText = "";
+        Label numberLabel = new Label("The NO." + questionNumber + " question: ");
+        Label questionLabel = new Label(questionText);
+
+        questionAndAnswer.getChildren().addAll(numberLabel, questionLabel);
+        //选择题的处理
+        if (questionNumber <= multipleChoiceQuestions.size()){
+            MultipleChoiceQuestion currentQuestion = multipleChoiceQuestions.get(questionNumber - 1);
+            questionText = currentQuestion.getQuestion();
+
+            VBox optionsBox = new VBox();
+            optionsBox.setSpacing(10);
+
+            ToggleGroup optionGroup = new ToggleGroup();
+
+            for (String option: currentQuestion.getOptions()){
+                RadioButton optionButton = new RadioButton(option);
+                optionButton.setToggleGroup(optionGroup);
+                optionsBox.getChildren().add(optionButton);
+            }
+            questionLabel.setText(questionText);
+            questionAndAnswer.getChildren().add(optionsBox);
+            questionAndAnswer.setAlignment(Pos.CENTER_LEFT);
+
+            imageView = new ImageView(new  Image("file:///D:/maura_computer science/BPIT/1s java/documents/finalproject/" + currentQuestion.getPicturePath()));
+            imageView.setFitHeight(200);
+            imageView.setFitWidth(200);
+            nextButton.setOnAction(e ->{
+                RadioButton selectedButton = (RadioButton) optionGroup.getSelectedToggle();//optionGroup.getSelectedToggle()方法返回一个Toggle对象
+                if (selectedButton == null) {
+                    showAlert("Error", "Please select an option.", Alert.AlertType.ERROR);
+                }else{
+                    questionNumber++;
+                    displayQuestions(wholePane, blankQuestions, multipleChoiceQuestions);
+                    String selectedOptionText = selectedButton.getText();//optionsBox.getChildren()返回一个ObservableList<Node>
+                    if (selectedOptionText.equalsIgnoreCase(currentQuestion.getAnswer())){
+                        correctAnswers++;}
+                }
+            });
+            //填空题的处理
+        }else if (questionNumber <= fillInBlankQuestion.size() + multipleChoiceQuestions.size()) {
+            FillInBlankQuestion currentQuestion = fillInBlankQuestion.get(questionNumber - multipleChoiceQuestions.size() - 1);
+            questionText = currentQuestion.getQuestion();
+            questionLabel.setText(questionText);
+            TextField answerField = new TextField();
+            questionAndAnswer.getChildren().add(answerField);
+            imageView = new ImageView(new Image("file:///D:/maura_computer science/BPIT/1s java/documents/finalproject/" + currentQuestion.getPicturePath()));
+            imageView.setFitHeight(200);
+            imageView.setFitWidth(200);
+
+            nextButton.setOnAction(e -> {
+                String inputAnswer = answerField.getText();
+                if (inputAnswer.isEmpty()) {
+                    showAlert("Error", "Please fill in the blank.", Alert.AlertType.ERROR);
+                }else {
+                    questionNumber++;
+                    displayQuestions(wholePane, blankQuestions, multipleChoiceQuestions);
+                    if (inputAnswer.equals(currentQuestion.getAnswer())){
+                        correctAnswers++;
+                    }
+                }
+            });
+        }
+        gridPane.add(imageView, 0 ,1);
+        gridPane.add(questionAndAnswer, 1,1);
+        gridPane.add(nextButton, 1, 5);
+        wholePane.getChildren().add(gridPane);
+
+        if (questionNumber > fillInBlankQuestion.size() + multipleChoiceQuestions.size()){
+            wholePane.getChildren().clear();
+            gridPane.getChildren().clear();
+            checkButton.setVisible(true);
+            wholePane.getChildren().add(checkButton);
+            checkButton.setOnAction(e ->{
+                Label feedback = new Label();
+                wholePane.getChildren().add(feedback);
+                feedback.setText("You answered " + correctAnswers + " questions correctly.\n\nLeave your contact information and we will contact you later.");
+                feedback.setFont(new Font("Arial", 15));
+                gridPane.add(new Label("Your name: "), 0,0);
+                TextField fanNameField = new TextField();
+                gridPane.add(fanNameField,1,0);
+                gridPane.add(new Label("Your phone number:"), 0,1);
+                TextField phoneField = new TextField();
+                gridPane.add(phoneField,1,1);
+                Button submitButton = new Button("Submit");
+                gridPane.add(submitButton, 1, 3);
+                wholePane.getChildren().add(gridPane);
+                checkButton.setVisible(false);
+                submitButton.setOnAction(es ->{
+                    if (fanNameField.getText().isEmpty() || phoneField.getText().isEmpty()) {
+                        showAlert("Error", "Please fill in all blanks.", Alert.AlertType.ERROR);}
+                    else{
+                        showAlert("Success", "Your data has been recorded.", Alert.AlertType.INFORMATION);
+                        submitButton.setDisable(true);
+                        try{
+                            FileWriter writer = new FileWriter(name +  " fan.txt", true);
+                            String fanInfo = String.format("\"%s\",\"%s\", %d\n", fanNameField.getText(), phoneField.getText(), correctAnswers);
+                            writer.write(fanInfo);
+                            writer.close();
+                        }catch (IOException ei){
+                            ei.printStackTrace();
+                        }
+
+                    }
+                });
+            });
+        }
+    }
+
+    public static void main(String[] args){
+        Application.launch(args);
+    }
+
+}
